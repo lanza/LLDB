@@ -76,6 +76,7 @@ struct VSCode {
   int64_t num_locals;
   int64_t num_globals;
   std::thread event_thread;
+  std::thread command_interpreter_thread;
   std::unique_ptr<std::ofstream> log;
   llvm::DenseMap<lldb::addr_t, int64_t> addr_to_source_ref;
   llvm::DenseMap<int64_t, SourceReference> source_map;

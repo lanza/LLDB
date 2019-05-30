@@ -189,6 +189,12 @@ public:
     void
     HandleCommand (const char *command);
 
+    void
+    EnableForwardEvents(lldb::SBListener &listener);
+
+    void
+    CancelForwardEvents();
+
     lldb::SBListener
     GetListener ();
 

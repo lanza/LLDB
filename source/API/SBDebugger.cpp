@@ -468,6 +468,25 @@ void SBDebugger::HandleCommand(const char *command) {
   }
 }
 
+void SBDebugger::EnableForwardEvents(lldb::SBListener &listener) {
+  LLDB_RECORD_METHOD(void, SBDebugger, EnableForwardEvents, (lldb::SBListener &), listener);
+
+  if (m_opaque_sp) {
+    ListenerSP listener_sp = listener.GetSP();
+    if (listener_sp) {
+      m_opaque_sp->EnableForwardEvents(listener_sp);
+    }
+  }
+}
+
+void SBDebugger::CancelForwardEvents() {
+  LLDB_RECORD_METHOD_NO_ARGS(void, SBDebugger, CancelForwardEvents);
+
+  if (m_opaque_sp) {
+    m_opaque_sp->CancelForwardEvents(nullptr);
+  }
+}
+
 SBListener SBDebugger::GetListener() {
   LLDB_RECORD_METHOD_NO_ARGS(lldb::SBListener, SBDebugger, GetListener);
 
@@ -1610,6 +1629,8 @@ void RegisterMethods<SBDebugger>(Registry &R) {
   LLDB_REGISTER_METHOD(lldb::SBCommandInterpreter, SBDebugger,
                        GetCommandInterpreter, ());
   LLDB_REGISTER_METHOD(void, SBDebugger, HandleCommand, (const char *));
+  LLDB_REGISTER_METHOD(void, SBDebugger, EnableForwardEvents, (lldb::SBListener &));
+  LLDB_REGISTER_METHOD(void, SBDebugger, CancelForwardEvents, ());
   LLDB_REGISTER_METHOD(lldb::SBListener, SBDebugger, GetListener, ());
   LLDB_REGISTER_METHOD(
       void, SBDebugger, HandleProcessEvent,

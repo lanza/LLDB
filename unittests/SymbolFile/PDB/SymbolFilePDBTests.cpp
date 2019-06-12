@@ -268,7 +268,7 @@ TEST_F(SymbolFilePDBTests, TestLineTablesMatchAll) {
   FileSpec header1("test-pdb.h");
   FileSpec header2("test-pdb-nested.h");
   uint32_t cus = symfile->GetNumCompileUnits();
-  EXPECT_EQ(2u, cus);
+  EXPECT_EQ(3u, cus);
 
   SymbolContextList sc_list;
   lldb::SymbolContextItem scope =
@@ -318,7 +318,7 @@ TEST_F(SymbolFilePDBTests, TestLineTablesMatchSpecific) {
   FileSpec header1("test-pdb.h");
   FileSpec header2("test-pdb-nested.h");
   uint32_t cus = symfile->GetNumCompileUnits();
-  EXPECT_EQ(2u, cus);
+  EXPECT_EQ(3u, cus);
 
   SymbolContextList sc_list;
   lldb::SymbolContextItem scope =

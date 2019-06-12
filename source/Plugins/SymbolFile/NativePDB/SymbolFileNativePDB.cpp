@@ -332,15 +332,6 @@ void SymbolFileNativePDB::InitializeObject() {
 uint32_t SymbolFileNativePDB::GetNumCompileUnits() {
   const DbiModuleList &modules = m_index->dbi().modules();
   uint32_t count = modules.getModuleCount();
-  if (count == 0)
-    return count;
-
-  // The linker can inject an additional "dummy" compilation unit into the
-  // PDB. Ignore this special compile unit for our purposes, if it is there.
-  // It is always the last one.
-  DbiModuleDescriptor last = modules.getModuleDescriptor(count - 1);
-  if (last.getModuleName() == "* Linker *")
-    --count;
   return count;
 }
 
@@ -955,11 +946,9 @@ uint32_t SymbolFileNativePDB::ResolveSymbolContext(
     llvm::Optional<uint16_t> modi = m_index->GetModuleIndexForVa(file_addr);
     if (!modi)
       return 0;
-    CompilandIndexItem *cci = m_index->compilands().GetCompiland(*modi);
-    if (!cci)
-      return 0;
+    CompilandIndexItem cci = m_index->compilands().GetOrCreateCompiland(*modi);
 
-    sc.comp_unit = GetOrCreateCompileUnit(*cci).get();
+    sc.comp_unit = GetOrCreateCompileUnit(cci).get();
     resolved_flags |= eSymbolContextCompUnit;
   }
 
@@ -977,20 +966,58 @@ uint32_t SymbolFileNativePDB::ResolveSymbolContext(
       PdbCompilandSymId csid = match.uid.asCompilandSym();
       CVSymbol cvs = m_index->ReadSymbolRecord(csid);
       PDB_SymType type = CVSymToPDBSym(cvs.kind());
-      if (type != PDB_SymType::Function && type != PDB_SymType::Block)
+      if (type != PDB_SymType::Function && type != PDB_SymType::Block &&
+          type != PDB_SymType::Thunk)
         continue;
-      if (type == PDB_SymType::Function) {
-        sc.function = GetOrCreateFunction(csid, *sc.comp_unit).get();
-        sc.block = sc.GetFunctionBlock();
-      }
 
-      if (type == PDB_SymType::Block) {
-        sc.block = &GetOrCreateBlock(csid);
-        sc.function = sc.block->CalculateSymbolContextFunction();
+      if (type == PDB_SymType::Thunk) {
+        auto symtab = m_obj_file->GetSymtab();
+        if (!symtab)
+          continue;
+
+        if (auto symbol = symtab->FindSymbolContainingFileAddress(file_addr)) {
+          sc.symbol = symbol;
+          resolved_flags |= eSymbolContextSymbol;
+        } else {
+          TrampolineSym tramp(static_cast<SymbolRecordKind>(cvs.kind()));
+          cantFail(
+              SymbolDeserializer::deserializeAs<TrampolineSym>(cvs, tramp));
+
+          auto section_list = m_obj_file->GetSectionList();
+          if (!section_list)
+            continue;
+          auto section = section_list->FindSectionByID(tramp.ThunkSection);
+
+          symtab->AddSymbol(Symbol(match.uid.toOpaqueId(), // symID
+                                   "IncrementalLinkThunk", // name
+                                   true,                   // name_is_mangled
+                                   eSymbolTypeTrampoline,
+                                   true,              // external
+                                   false,             // is_debug
+                                   true,              // is_trampoline
+                                   false,             // is_artificial
+                                   section,           // section_sp
+                                   tramp.ThunkOffset, // value
+                                   tramp.Size,        // size
+                                   tramp.Size != 0,   // size_is_valid
+                                   false, // contains_linker_annotations
+                                   0      // flags
+                                   ));
+        }
+      } else {
+        if (type == PDB_SymType::Function) {
+          sc.function = GetOrCreateFunction(csid, *sc.comp_unit).get();
+          sc.block = sc.GetFunctionBlock();
+        }
+
+        if (type == PDB_SymType::Block) {
+          sc.block = &GetOrCreateBlock(csid);
+          sc.function = sc.block->CalculateSymbolContextFunction();
+        }
+        resolved_flags |= eSymbolContextFunction;
+        resolved_flags |= eSymbolContextBlock;
       }
-    resolved_flags |= eSymbolContextFunction;
-    resolved_flags |= eSymbolContextBlock;
-    break;
+      break;
     }
   }
 

@@ -206,16 +206,6 @@ uint32_t SymbolFilePDB::GetNumCompileUnits() {
     // llvm::pdb::IPDBSession methods, such compilands will all be searched
     // automatically no matter whether we include them or not.
     m_cached_compile_unit_count = compilands->getChildCount();
-
-    // The linker can inject an additional "dummy" compilation unit into the
-    // PDB. Ignore this special compile unit for our purposes, if it is there.
-    // It is always the last one.
-    auto last_compiland_up =
-        compilands->getChildAtIndex(m_cached_compile_unit_count - 1);
-    lldbassert(last_compiland_up.get());
-    std::string name = last_compiland_up->getName();
-    if (name == "* Linker *")
-      --m_cached_compile_unit_count;
   }
   return m_cached_compile_unit_count;
 }

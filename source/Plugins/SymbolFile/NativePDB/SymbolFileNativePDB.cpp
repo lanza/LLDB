@@ -903,7 +903,13 @@ lldb::LanguageType SymbolFileNativePDB::ParseLanguage(CompileUnit &comp_unit) {
   return TranslateLanguage(item->m_compile_opts->getLanguage());
 }
 
-void SymbolFileNativePDB::AddSymbols(Symtab &symtab) { return; }
+void SymbolFileNativePDB::AddSymbols(Symtab &symtab) { 
+  std::set<lldb::addr_t> sym_addresses;
+  for (size_t i = 0; i < symtab.GetNumSymbols(); i++)
+    sym_addresses.insert(symtab.SymbolAtIndex(i)->GetFileAddress());
+
+  return;
+}
 
 size_t SymbolFileNativePDB::ParseFunctions(CompileUnit &comp_unit) {
   PdbSymUid uid{comp_unit.GetID()};

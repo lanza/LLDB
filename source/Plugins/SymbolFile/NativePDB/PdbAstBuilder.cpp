@@ -1003,6 +1003,10 @@ clang::QualType PdbAstBuilder::GetOrCreateType(PdbTypeSymId type) {
   return qt;
 }
 
+void PdbAstBuilder::CreateFunctionDecl(PdbCompilandSymId func_id) {
+  GetOrCreateFunctionDecl(func_id);
+}
+
 clang::FunctionDecl *
 PdbAstBuilder::GetOrCreateFunctionDecl(PdbCompilandSymId func_id) {
   if (clang::Decl *decl = TryGetDecl(func_id))

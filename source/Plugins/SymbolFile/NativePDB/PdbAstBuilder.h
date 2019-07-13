@@ -60,7 +60,7 @@ public:
   lldb_private::CompilerDeclContext GetOrCreateDeclContextForUid(PdbSymUid uid);
   lldb_private::CompilerDeclContext GetParentDeclContext(PdbSymUid uid);
 
-  clang::FunctionDecl *GetOrCreateFunctionDecl(PdbCompilandSymId func_id);
+  void CreateFunctionDecl(PdbCompilandSymId func_id);
   clang::BlockDecl *GetOrCreateBlockDecl(PdbCompilandSymId block_id);
   clang::VarDecl *GetOrCreateVariableDecl(PdbCompilandSymId scope_id,
                                           PdbCompilandSymId var_id);
@@ -86,6 +86,8 @@ public:
   void Dump(Stream &stream);
 
 private:
+  clang::FunctionDecl *GetOrCreateFunctionDecl(PdbCompilandSymId func_id);
+
   clang::Decl *TryGetDecl(PdbSymUid uid) const;
 
   using TypeIndex = llvm::codeview::TypeIndex;

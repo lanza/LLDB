@@ -410,7 +410,7 @@ lldb::FunctionSP SymbolFileNativePDB::CreateFunction(PdbCompilandSymId func_id,
 
   comp_unit.AddFunction(func_sp);
 
-  m_ast->GetOrCreateFunctionDecl(func_id);
+  m_ast->CreateFunctionDecl(func_id);
 
   return func_sp;
 }

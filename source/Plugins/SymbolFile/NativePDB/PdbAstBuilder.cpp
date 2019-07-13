@@ -489,19 +489,20 @@ llvm::Optional<CompilerDecl> PdbAstBuilder::GetOrCreateDeclForUid(PdbSymUid uid)
   return ToCompilerDecl(*result);
 }
 
-clang::DeclContext *PdbAstBuilder::GetOrCreateDeclContextForUid(PdbSymUid uid) {
+lldb_private::CompilerDeclContext
+PdbAstBuilder::GetOrCreateDeclContextForUid(PdbSymUid uid) {
   if (uid.kind() == PdbSymUidKind::CompilandSym) {
     if (uid.asCompilandSym().offset == 0)
-      return FromCompilerDeclContext(GetTranslationUnitDecl());
+      return GetTranslationUnitDecl();
   }
   auto option = GetOrCreateDeclForUid(uid);
   if (!option)
     return nullptr;
   clang::Decl *decl = FromCompilerDecl(option.getValue());
   if (!decl)
-    return nullptr;
+    return CompilerDeclContext();
 
-  return clang::Decl::castToDeclContext(decl);
+  return ToCompilerDeclContext(*clang::Decl::castToDeclContext(decl));
 }
 
 std::pair<clang::DeclContext *, std::string>
@@ -587,8 +588,13 @@ clang::DeclContext *PdbAstBuilder::GetParentDeclContext(PdbSymUid uid) {
   case PdbSymUidKind::CompilandSym: {
     llvm::Optional<PdbCompilandSymId> scope =
         FindSymbolScope(m_index, uid.asCompilandSym());
-    if (scope)
-      return GetOrCreateDeclContextForUid(*scope);
+    if (scope) {
+      lldb_private::CompilerDeclContext decl_ctx =
+          GetOrCreateDeclContextForUid(*scope);
+      auto ctx =
+          static_cast<clang::DeclContext *>(decl_ctx.GetOpaqueDeclContext());
+      return ctx;
+    }
 
     CVSymbol sym = m_index.ReadSymbolRecord(uid.asCompilandSym());
     return GetParentDeclContextForSymbol(sym);
@@ -600,7 +606,8 @@ clang::DeclContext *PdbAstBuilder::GetParentDeclContext(PdbSymUid uid) {
     auto iter = m_parent_types.find(type_id.index);
     if (iter == m_parent_types.end())
       return FromCompilerDeclContext(GetTranslationUnitDecl());
-    return GetOrCreateDeclContextForUid(PdbTypeSymId(iter->second));
+    auto ctx = GetOrCreateDeclContextForUid(PdbTypeSymId(iter->second));
+    return FromCompilerDeclContext(ctx);
   }
   case PdbSymUidKind::FieldListMember:
     // In this case the parent DeclContext is the one for the class that this
@@ -857,7 +864,10 @@ PdbAstBuilder::GetOrCreateVariableDecl(PdbCompilandSymId scope_id,
   if (clang::Decl *decl = TryGetDecl(var_id))
     return llvm::dyn_cast<clang::VarDecl>(decl);
 
-  clang::DeclContext *scope = GetOrCreateDeclContextForUid(scope_id);
+  lldb_private::CompilerDeclContext lldb_scope =
+      GetOrCreateDeclContextForUid(scope_id);
+  auto scope =
+      static_cast<clang::DeclContext *>(lldb_scope.GetOpaqueDeclContext());
 
   CVSymbol sym = m_index.ReadSymbolRecord(var_id);
   return CreateVariableDecl(PdbSymUid(var_id), sym, *scope);

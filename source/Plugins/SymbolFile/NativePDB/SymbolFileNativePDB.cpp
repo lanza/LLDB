@@ -595,7 +595,6 @@ TypeSP SymbolFileNativePDB::CreateArrayType(PdbTypeSymId type_id,
   return array_sp;
 }
 
-
 TypeSP SymbolFileNativePDB::CreateFunctionType(PdbTypeSymId type_id,
                                                const MemberFunctionRecord &mfr,
                                                CompilerType ct) {
@@ -668,7 +667,8 @@ TypeSP SymbolFileNativePDB::CreateType(PdbTypeSymId type_id, CompilerType ct) {
   }
   if (cvt.kind() == LF_MFUNCTION) {
     MemberFunctionRecord mfr;
-    llvm::cantFail(TypeDeserializer::deserializeAs<MemberFunctionRecord>(cvt, mfr));
+    llvm::cantFail(
+        TypeDeserializer::deserializeAs<MemberFunctionRecord>(cvt, mfr));
     return CreateFunctionType(type_id, mfr, ct);
   }
 
@@ -1236,9 +1236,9 @@ uint32_t SymbolFileNativePDB::FindFunctions(const RegularExpression &regex,
 }
 
 uint32_t SymbolFileNativePDB::FindTypes(
-    ConstString name, const CompilerDeclContext *parent_decl_ctx,
-    bool append, uint32_t max_matches,
-    llvm::DenseSet<SymbolFile *> &searched_symbol_files, TypeMap &types) {
+    ConstString name, const CompilerDeclContext *parent_decl_ctx, bool append,
+    uint32_t max_matches, llvm::DenseSet<SymbolFile *> &searched_symbol_files,
+    TypeMap &types) {
   if (!append)
     types.Clear();
   if (!name)
@@ -1514,12 +1514,14 @@ CompilerDecl SymbolFileNativePDB::GetDeclForUID(lldb::user_id_t uid) {
 
 CompilerDeclContext
 SymbolFileNativePDB::GetDeclContextForUID(lldb::user_id_t uid) {
-  clang::DeclContext *context =
+  lldb_private::CompilerDeclContext context =
       m_ast->GetOrCreateDeclContextForUid(PdbSymUid(uid));
   if (!context)
     return {};
 
-  return m_ast->ToCompilerDeclContext(*context);
+  auto clang_ctx =
+      static_cast<clang::DeclContext *>(context.GetOpaqueDeclContext());
+  return m_ast->ToCompilerDeclContext(*clang_ctx);
 }
 
 CompilerDeclContext
@@ -1553,7 +1555,6 @@ SymbolFileNativePDB::GetDynamicArrayInfoForUID(
     lldb::user_id_t type_uid, const lldb_private::ExecutionContext *exe_ctx) {
   return llvm::None;
 }
-
 
 bool SymbolFileNativePDB::CompleteType(CompilerType &compiler_type) {
   clang::QualType qt =

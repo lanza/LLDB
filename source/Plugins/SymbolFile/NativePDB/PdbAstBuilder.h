@@ -61,7 +61,7 @@ public:
   lldb_private::CompilerDeclContext GetParentDeclContext(PdbSymUid uid);
 
   void CreateFunctionDecl(PdbCompilandSymId func_id);
-  clang::BlockDecl *GetOrCreateBlockDecl(PdbCompilandSymId block_id);
+  void CreateBlockDecl(PdbCompilandSymId block_id);
   clang::VarDecl *GetOrCreateVariableDecl(PdbCompilandSymId scope_id,
                                           PdbCompilandSymId var_id);
   clang::VarDecl *GetOrCreateVariableDecl(PdbGlobalSymId var_id);
@@ -87,6 +87,7 @@ public:
 
 private:
   clang::FunctionDecl *GetOrCreateFunctionDecl(PdbCompilandSymId func_id);
+  clang::BlockDecl *GetOrCreateBlockDecl(PdbCompilandSymId block_id);
 
   clang::Decl *TryGetDecl(PdbSymUid uid) const;
 

@@ -827,6 +827,10 @@ PdbAstBuilder::GetOrCreateNamespaceDecl(const char *name,
       IsAnonymousNamespaceName(name) ? nullptr : name, &context);
 }
 
+void PdbAstBuilder::CreateBlockDecl(PdbCompilandSymId block_id) {
+  GetOrCreateBlockDecl(block_id);
+}
+
 clang::BlockDecl *
 PdbAstBuilder::GetOrCreateBlockDecl(PdbCompilandSymId block_id) {
   if (clang::Decl *decl = TryGetDecl(block_id))

@@ -369,7 +369,7 @@ Block &SymbolFileNativePDB::CreateBlock(PdbCompilandSymId block_id) {
   BlockSP child_block = std::make_shared<Block>(opaque_block_uid);
   parent_block.AddChild(child_block);
 
-  m_ast->GetOrCreateBlockDecl(block_id);
+  m_ast->CreateBlockDecl(block_id);
 
   m_blocks.insert({opaque_block_uid, child_block});
   return *child_block;

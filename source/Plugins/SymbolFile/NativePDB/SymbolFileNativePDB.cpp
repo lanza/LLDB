@@ -1526,8 +1526,7 @@ SymbolFileNativePDB::GetDeclContextForUID(lldb::user_id_t uid) {
 
 CompilerDeclContext
 SymbolFileNativePDB::GetDeclContextContainingUID(lldb::user_id_t uid) {
-  clang::DeclContext *context = m_ast->GetParentDeclContext(PdbSymUid(uid));
-  return m_ast->ToCompilerDeclContext(*context);
+  return m_ast->GetParentDeclContext(PdbSymUid(uid));
 }
 
 Type *SymbolFileNativePDB::ResolveTypeUID(lldb::user_id_t type_uid) {

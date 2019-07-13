@@ -58,7 +58,7 @@ public:
   llvm::Optional<lldb_private::CompilerDecl>
   GetOrCreateDeclForUid(PdbSymUid uid);
   lldb_private::CompilerDeclContext GetOrCreateDeclContextForUid(PdbSymUid uid);
-  clang::DeclContext *GetParentDeclContext(PdbSymUid uid);
+  lldb_private::CompilerDeclContext GetParentDeclContext(PdbSymUid uid);
 
   clang::FunctionDecl *GetOrCreateFunctionDecl(PdbCompilandSymId func_id);
   clang::BlockDecl *GetOrCreateBlockDecl(PdbCompilandSymId block_id);

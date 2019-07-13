@@ -442,7 +442,9 @@ clang::Decl *PdbAstBuilder::GetOrCreateSymbolForId(PdbCompilandSymId id) {
   CVSymbol cvs = m_index.ReadSymbolRecord(id);
 
   if (isLocalVariableType(cvs.kind())) {
-    clang::DeclContext *scope = GetParentDeclContext(id);
+    lldb_private::CompilerDeclContext decl_ctx = GetParentDeclContext(id);
+    auto scope =
+        static_cast<clang::DeclContext *>(decl_ctx.GetOpaqueDeclContext());
     clang::Decl *scope_decl = clang::Decl::castFromDeclContext(scope);
     PdbCompilandSymId scope_id(id.modi, m_decl_to_status[scope_decl].uid);
     return GetOrCreateVariableDecl(scope_id, id);
@@ -581,23 +583,20 @@ PdbAstBuilder::GetParentDeclContextForSymbol(const CVSymbol &sym) {
   return context;
 }
 
-clang::DeclContext *PdbAstBuilder::GetParentDeclContext(PdbSymUid uid) {
+lldb_private::CompilerDeclContext
+PdbAstBuilder::GetParentDeclContext(PdbSymUid uid) {
   // We must do this *without* calling GetOrCreate on the current uid, as
   // that would be an infinite recursion.
   switch (uid.kind()) {
   case PdbSymUidKind::CompilandSym: {
     llvm::Optional<PdbCompilandSymId> scope =
         FindSymbolScope(m_index, uid.asCompilandSym());
-    if (scope) {
-      lldb_private::CompilerDeclContext decl_ctx =
-          GetOrCreateDeclContextForUid(*scope);
-      auto ctx =
-          static_cast<clang::DeclContext *>(decl_ctx.GetOpaqueDeclContext());
-      return ctx;
-    }
+    if (scope)
+      return GetOrCreateDeclContextForUid(*scope);
 
     CVSymbol sym = m_index.ReadSymbolRecord(uid.asCompilandSym());
-    return GetParentDeclContextForSymbol(sym);
+    clang::DeclContext *decl_ctx = GetParentDeclContextForSymbol(sym);
+    return CompilerDeclContext(&m_clang, decl_ctx);
   }
   case PdbSymUidKind::Type: {
     // It could be a namespace, class, or global.  We don't support nested
@@ -605,9 +604,8 @@ clang::DeclContext *PdbAstBuilder::GetParentDeclContext(PdbSymUid uid) {
     PdbTypeSymId type_id = uid.asTypeSym();
     auto iter = m_parent_types.find(type_id.index);
     if (iter == m_parent_types.end())
-      return FromCompilerDeclContext(GetTranslationUnitDecl());
-    auto ctx = GetOrCreateDeclContextForUid(PdbTypeSymId(iter->second));
-    return FromCompilerDeclContext(ctx);
+      return GetTranslationUnitDecl();
+    return GetOrCreateDeclContextForUid(PdbTypeSymId(iter->second));
   }
   case PdbSymUidKind::FieldListMember:
     // In this case the parent DeclContext is the one for the class that this
@@ -623,8 +621,10 @@ clang::DeclContext *PdbAstBuilder::GetParentDeclContext(PdbSymUid uid) {
     CVSymbol global = m_index.ReadSymbolRecord(uid.asGlobalSym());
     switch (global.kind()) {
     case SymbolKind::S_GDATA32:
-    case SymbolKind::S_LDATA32:
-      return GetParentDeclContextForSymbol(global);
+    case SymbolKind::S_LDATA32: {
+      clang::DeclContext *decl_ctx = GetParentDeclContextForSymbol(global);
+      return CompilerDeclContext(&m_clang, decl_ctx);
+    }
     case SymbolKind::S_PROCREF:
     case SymbolKind::S_LPROCREF: {
       ProcRefSym ref{global.kind()};
@@ -634,8 +634,11 @@ clang::DeclContext *PdbAstBuilder::GetParentDeclContext(PdbSymUid uid) {
       return GetParentDeclContext(cu_sym_id);
     }
     case SymbolKind::S_CONSTANT:
-    case SymbolKind::S_UDT:
-      return CreateDeclInfoForUndecoratedName(getSymbolName(global)).first;
+    case SymbolKind::S_UDT: {
+      clang::DeclContext *decl_ctx =
+          CreateDeclInfoForUndecoratedName(getSymbolName(global)).first;
+      return CompilerDeclContext(&m_clang, decl_ctx);
+    }
     default:
       break;
     }
@@ -644,7 +647,7 @@ clang::DeclContext *PdbAstBuilder::GetParentDeclContext(PdbSymUid uid) {
   default:
     break;
   }
-  return FromCompilerDeclContext(GetTranslationUnitDecl());
+  return GetTranslationUnitDecl();
 }
 
 bool PdbAstBuilder::CompleteType(clang::QualType qt) {
@@ -829,7 +832,9 @@ PdbAstBuilder::GetOrCreateBlockDecl(PdbCompilandSymId block_id) {
   if (clang::Decl *decl = TryGetDecl(block_id))
     return llvm::dyn_cast<clang::BlockDecl>(decl);
 
-  clang::DeclContext *scope = GetParentDeclContext(block_id);
+  lldb_private::CompilerDeclContext decl_ctx = GetParentDeclContext(block_id);
+  auto scope =
+      static_cast<clang::DeclContext *>(decl_ctx.GetOpaqueDeclContext());
 
   clang::BlockDecl *block_decl = m_clang.CreateBlockDeclaration(scope);
   m_uid_to_decl.insert({toOpaqueUid(block_id), block_decl});
@@ -891,7 +896,9 @@ PdbAstBuilder::GetOrCreateTypedefDecl(PdbGlobalSymId id) {
   lldbassert(sym.kind() == S_UDT);
   UDTSym udt = llvm::cantFail(SymbolDeserializer::deserializeAs<UDTSym>(sym));
 
-  clang::DeclContext *scope = GetParentDeclContext(id);
+  lldb_private::CompilerDeclContext decl_ctx = GetParentDeclContext(id);
+  auto scope =
+      static_cast<clang::DeclContext *>(decl_ctx.GetOpaqueDeclContext());
 
   PdbTypeSymId real_type_id{udt.Type, false};
   clang::QualType qt = GetOrCreateType(real_type_id);
@@ -1001,7 +1008,10 @@ PdbAstBuilder::GetOrCreateFunctionDecl(PdbCompilandSymId func_id) {
   if (clang::Decl *decl = TryGetDecl(func_id))
     return llvm::dyn_cast<clang::FunctionDecl>(decl);
 
-  clang::DeclContext *parent = GetParentDeclContext(PdbSymUid(func_id));
+  lldb_private::CompilerDeclContext decl_ctx =
+      GetParentDeclContext(PdbSymUid(func_id));
+  auto parent =
+      static_cast<clang::DeclContext *>(decl_ctx.GetOpaqueDeclContext());
   std::string context_name;
   if (clang::NamespaceDecl *ns = llvm::dyn_cast<clang::NamespaceDecl>(parent)) {
     context_name = ns->getQualifiedNameAsString();
